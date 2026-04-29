@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Team Planer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Sora:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="touchGate" class="touch-gate hidden" role="alert">
+    <div class="touch-gate-card">
+      <h1>Interaktives Board</h1>
+      <p>Dieser Planer ist für Touch optimiert und unterstützt Maus für Tests.</p>
+      <p>Wähle zuerst ein Teammitglied aus und danach die Zielkategorie.</p>
+    </div>
+  </div>
+
+  <div class="brand-mark" aria-hidden="true">
+    <img src="assets/Audi-Rings-Logo_black.png" alt="Audi Ringe schwarz" class="brand-mark-image brand-mark-image-light">
+    <img src="assets/audi-ringe_weiss_0.png" alt="Audi Ringe weiß" class="brand-mark-image brand-mark-image-dark">
+  </div>
+
+  <div class="app-shell" id="appShell">
+    <main class="content">
+      <section class="weather-panel panel" aria-label="Wetterinformationen">
+        <div class="weather-head">
+          <div>
+            <p class="weather-kicker">Wetter heute</p>
+            <h2 id="weatherLocation">Wetter wird geladen</h2>
+            <p id="weatherStatus">Standort wird ermittelt und Wetterdaten werden geladen.</p>
+          </div>
+          <div class="weather-clock" aria-label="Aktuelle Zeit">
+            <div id="clockTime" class="weather-clock-time">--:--:--</div>
+            <div id="clockDate" class="weather-clock-date">--</div>
+          </div>
+        </div>
+
+        <div class="weather-main">
+          <div class="weather-hero">
+            <div id="weatherIcon" class="weather-icon">--</div>
+            <div>
+              <div id="weatherTemp" class="weather-temp">--°C</div>
+              <div id="weatherSummary" class="weather-summary">--</div>
+            </div>
+          </div>
+
+          <div class="weather-details">
+            <article class="weather-metric"><span>Gefühlt</span><strong id="weatherFeelsLike">--°C</strong></article>
+            <article class="weather-metric"><span>Wind</span><strong id="weatherWind">-- km/h</strong></article>
+            <article class="weather-metric"><span>Niederschlag</span><strong id="weatherPrecip">-- mm</strong></article>
+            <article class="weather-metric"><span>Luftfeuchte</span><strong id="weatherHumidity">--%</strong></article>
+            <article class="weather-metric"><span>UV-Index</span><strong id="weatherUv">--</strong></article>
+            <article class="weather-metric"><span>Sichtweite</span><strong id="weatherVisibility">-- km</strong></article>
+          </div>
+        </div>
+
+        <div class="weather-forecast">
+          <div class="weather-forecast-head">
+            <h3>Ausblick nächste Tage</h3>
+            <span id="weatherUpdateState">Aktualisiert bei Bedarf</span>
+          </div>
+          <div id="weatherForecast" class="forecast-grid"></div>
+        </div>
+      </section>
+
+      <section id="teamPlannerView" class="module-view active" data-module-id="team-planner">
+        <header class="page-head">
+          <div class="page-head-title">
+            <h2>Aktuelle Team-Standorte</h2>
+          </div>
+          <div class="header-actions">
+            <button id="adminToggle" class="admin-toggle" type="button" aria-controls="adminPanel" aria-expanded="false">Settings</button>
+          </div>
+        </header>
+
+        <section class="board-wrap panel">
+          <div id="board" class="board" aria-live="polite"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="adminBackdrop" class="admin-backdrop"></div>
+  <aside id="adminPanel" class="admin-panel" aria-label="Teamverwaltung">
+    <div class="admin-head">
+      <h3>Teamverwaltung</h3>
+      <div class="admin-head-actions">
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Dunkelmodus aktivieren" aria-pressed="false">
+          <span id="themeToggleIcon" aria-hidden="true">☀️</span>
+        </button>
+        <button id="adminClose" class="ghost-btn" type="button">Schließen</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <form id="memberForm" class="panel form-panel">
+        <h3>Mitglied hinzufügen</h3>
+        <label>
+          Name
+          <input id="memberName" type="text" maxlength="40" placeholder="z. B. Alex Chen" required>
+        </label>
+        <label>
+          Kategorie
+          <select id="memberCategory"></select>
+        </label>
+        <button type="submit" class="btn-primary">Mitglied erstellen</button>
+      </form>
+    </div>
+
+    <div class="admin-section panel manage-list-panel">
+      <h3>Mitglieder entfernen</h3>
+      <div id="memberManageList" class="manage-list"></div>
+    </div>
+  </aside>
+
+  <div id="returnDateBackdrop" class="dialog-backdrop" hidden></div>
+  <div id="returnDateDialog" class="dialog" role="dialog" aria-modal="true" aria-labelledby="returnDateTitle" hidden>
+    <h3 id="returnDateTitle">Rückkehrdatum auswählen</h3>
+    <p id="returnDateDescription" class="dialog-text"></p>
+    <div class="calendar-shell">
+      <div class="calendar-header">
+        <button id="calendarPrev" type="button" class="calendar-nav">&#8249;</button>
+        <div id="calendarLabel" class="calendar-label"></div>
+        <button id="calendarNext" type="button" class="calendar-nav">&#8250;</button>
+      </div>
+      <div class="calendar-weekdays" aria-hidden="true">
+        <span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span>
+      </div>
+      <div id="calendarGrid" class="calendar-grid" role="grid" aria-label="Kalender"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
