@@ -9,6 +9,7 @@ const DEFAULT_TEAM_NAMES = ["Sam", "Jordan", "Mila"];
 const FIXED_CATEGORIES = [
   { id: "buero", name: "Büro" },
   { id: "unterwegs", name: "Unterwegs" },
+  { id: "feierabend", name: "Feierabend" },
   { id: "berufsschule", name: "Berufsschule" },
   { id: "urlaub", name: "Urlaub" }
 ];
