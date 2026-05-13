@@ -144,7 +144,11 @@
         <button id="siteModalOpenNew" class="ghost-btn">Open in new tab</button>
       </div>
       <div class="site-modal-frame-wrap">
-        <iframe id="siteModalFrame" sandbox="allow-scripts allow-forms allow-same-origin allow-popups"></iframe>
+        <iframe id="siteModalFrame"
+                sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-presentation"
+                allow="fullscreen"
+                allowfullscreen
+                title="External Site"></iframe>
       </div>
     </div>
   </div>
