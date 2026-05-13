@@ -5,6 +5,7 @@ const CLOCK_REFRESH_MS = 1000;
 const STATE_API_URL = "/api/state";
 const WEATHER_LOCATION = { latitude: 48.78, longitude: 11.42, label: "Ingolstadt" };
 const DEFAULT_TEAM_NAMES = ["Sam", "Jordan", "Mila"];
+const POPUP_SITE_URL = "https://localhost:8080"; // change this later to your desired site
 
 const FIXED_CATEGORIES = [
   { id: "buero", name: "Büro" },
@@ -59,6 +60,13 @@ const refs = {
   calendarNext: document.getElementById("calendarNext"),
   calendarLabel: document.getElementById("calendarLabel"),
   calendarGrid: document.getElementById("calendarGrid")
+  ,
+  siteModal: document.getElementById("siteModal"),
+  siteModalBackdrop: document.getElementById("siteModalBackdrop"),
+  siteModalClose: document.getElementById("siteModalClose"),
+  siteModalInfo: document.getElementById("siteModalInfo"),
+  siteModalFrame: document.getElementById("siteModalFrame"),
+  siteModalOpenNew: document.getElementById("siteModalOpenNew")
 };
 
 let returnDateResolver = null;
@@ -83,6 +91,7 @@ async function initialize() {
   setupForms();
   setupThemeToggle();
   setupAdminPanel();
+  setupPopupButton();
   startWeatherRefresh();
   startClockRefresh();
   loadWeather();
@@ -90,6 +99,52 @@ async function initialize() {
   applyTheme();
   applyAdminState();
   await saveState();
+}
+
+function setupPopupButton() {
+  const btn = document.getElementById("openPopupBtn");
+  if (!btn) return;
+
+  btn.addEventListener("pointerup", () => {
+    const url = POPUP_SITE_URL;
+    openSitePopup(url);
+  });
+}
+
+function openSitePopup(siteUrl) {
+  // Show modal inside the current page with centered iframe.
+  if (!refs.siteModal || !refs.siteModalFrame) {
+    // Fallback: open in new window if modal elements missing
+    const win = window.open(siteUrl, "sitePopup", "width=1000,height=700,resizable=yes,scrollbars=yes");
+    if (win) try { win.focus(); } catch (e) {}
+    return win;
+  }
+
+  refs.siteModalInfo.textContent = siteUrl;
+  refs.siteModalFrame.src = siteUrl;
+  refs.siteModal.classList.add('open');
+
+  const closeModal = () => {
+    refs.siteModal.classList.remove('open');
+    try {
+      refs.siteModalFrame.src = 'about:blank';
+    } catch (e) {}
+    refs.siteModalBackdrop.removeEventListener('pointerup', onBackdrop);
+    refs.siteModalClose.removeEventListener('pointerup', onClose);
+    refs.siteModalOpenNew.removeEventListener('pointerup', onOpenNew);
+  };
+
+  function onBackdrop() { closeModal(); }
+  function onClose() { closeModal(); }
+  function onOpenNew() { window.open(siteUrl, '_blank'); }
+
+  refs.siteModalBackdrop.addEventListener('pointerup', onBackdrop);
+  refs.siteModalClose.addEventListener('pointerup', onClose);
+  refs.siteModalOpenNew.addEventListener('pointerup', onOpenNew);
+
+  return {
+    close: () => closeModal()
+  };
 }
 
 function setupForms() {
