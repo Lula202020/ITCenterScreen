@@ -5,7 +5,7 @@ const CLOCK_REFRESH_MS = 1000;
 const STATE_API_URL = "/api/state";
 const WEATHER_LOCATION = { latitude: 48.78, longitude: 11.42, label: "Ingolstadt" };
 const DEFAULT_TEAM_NAMES = ["Sam", "Jordan", "Mila"];
-const POPUP_SITE_URL = "https://localhost:8080"; // change this later to your desired site
+const POPUP_SITE_URL = "http://localhost:8080"; // Flappy Bird WebGL server
 
 const FIXED_CATEGORIES = [
   { id: "buero", name: "Büro" },
