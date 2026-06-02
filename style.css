@@ -14,6 +14,11 @@
   --radius-lg: 18px;
   --radius-md: 12px;
   --radius-sm: 10px;
+  --forecast-surface: #000000;
+  --forecast-border: rgba(255, 255, 255, 0.12);
+  --forecast-grid: rgba(255, 255, 255, 0.08);
+  --forecast-text: #f4f8fc;
+  --forecast-muted: #c8d3df;
 }
 
 body[data-theme="light"] {
@@ -28,6 +33,11 @@ body[data-theme="light"] {
   --accent: #148b78;
   --accent-strong: #0c6f5f;
   --shadow: 0 14px 38px rgba(20, 31, 44, 0.12);
+  --forecast-surface: #ffffff;
+  --forecast-border: rgba(16, 23, 36, 0.12);
+  --forecast-grid: rgba(16, 23, 36, 0.08);
+  --forecast-text: #101724;
+  --forecast-muted: #526173;
 }
 
 body[data-theme="light"] .touch-gate {
@@ -517,6 +527,9 @@ select {
 }
 
 .forecast-card {
+  width: 100%;
+  appearance: none;
+  cursor: pointer;
   padding: 12px;
   border-radius: 12px;
   background: rgba(8, 14, 22, 0.72);
@@ -524,6 +537,17 @@ select {
   display: grid;
   gap: 8px;
   text-align: center;
+}
+
+.forecast-card:hover,
+.forecast-card:focus-visible {
+  border-color: rgba(32, 211, 184, 0.72);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.forecast-card:focus-visible {
+  box-shadow: 0 0 0 2px rgba(32, 211, 184, 0.3);
 }
 
 .forecast-day {
@@ -881,6 +905,115 @@ body[data-theme="light"] .member-card.selected-member {
   pointer-events: none;
 }
 
+.forecast-dialog {
+  width: min(1700px, 98vw);
+  height: auto;
+  max-height: calc(100vh - 16px);
+  overflow: hidden;
+  padding: 16px;
+  gap: 10px;
+  background: var(--forecast-surface);
+  border-color: var(--forecast-border);
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.forecast-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.forecast-dialog-head h3 {
+  font-size: 1.18rem;
+  margin-top: 4px;
+  color: var(--forecast-text);
+}
+
+.forecast-close {
+  border: 1px solid var(--forecast-border);
+  background: var(--forecast-surface);
+  color: var(--forecast-text);
+  border-radius: 999px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+}
+
+.forecast-chart-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 14px;
+  background: var(--forecast-surface);
+  border: 1px solid var(--forecast-border);
+  min-height: 0;
+  height: clamp(300px, 34vh, 390px);
+}
+
+.forecast-chart-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.forecast-chart-head h4 {
+  margin: 0;
+  font-size: 1.12rem;
+}
+
+.forecast-chart-head span {
+  color: var(--forecast-muted);
+  font-size: 1rem;
+}
+
+.forecast-chart {
+  min-height: 0;
+  height: 100%;
+}
+
+.forecast-chart-empty {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  color: var(--forecast-muted);
+  font-size: 0.92rem;
+}
+
+.forecast-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-height: 0;
+}
+
+.forecast-chart-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.forecast-chart-panel,
+.forecast-chart-canvas {
+  box-sizing: border-box;
+}
+
+body[data-theme="light"] .forecast-chart-panel {
+  background: #ffffff;
+}
+
+.forecast-chart-panel h4,
+.forecast-dialog-head h3,
+.forecast-dialog-head .dialog-text {
+  color: var(--forecast-text);
+}
+
+body[data-theme="light"] .forecast-close {
+  background: #ffffff;
+}
+
 .admin-backdrop {
   position: fixed;
   inset: 0;
@@ -1120,6 +1253,20 @@ body[data-theme="light"] .manage-row {
     grid-template-columns: 1fr 1fr;
   }
 
+  .forecast-dialog {
+    width: min(98vw, 1700px);
+    height: auto;
+    max-height: calc(100vh - 14px);
+  }
+
+  .forecast-chart-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .forecast-chart-panel {
+    height: clamp(260px, 30vh, 320px);
+  }
+
   .board-wrap {
     overflow: auto;
   }
@@ -1137,6 +1284,15 @@ body[data-theme="light"] .manage-row {
   .weather-details,
   .forecast-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .forecast-dialog {
+    height: auto;
+    max-height: calc(100vh - 20px);
+  }
+
+  .forecast-chart-panel {
+    height: clamp(280px, 32vh, 340px);
   }
 }
 

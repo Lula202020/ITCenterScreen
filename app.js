@@ -61,6 +61,16 @@ const refs = {
   calendarLabel: document.getElementById("calendarLabel"),
   calendarGrid: document.getElementById("calendarGrid")
   ,
+  forecastDialog: document.getElementById("forecastDialog"),
+  forecastBackdrop: document.getElementById("forecastBackdrop"),
+  forecastClose: document.getElementById("forecastClose"),
+  forecastTitle: document.getElementById("forecastTitle"),
+  forecastDate: document.getElementById("forecastDate"),
+  forecastChart: document.getElementById("forecastChart"),
+  forecastChartTemperature: document.getElementById("forecastChartTemperature"),
+  forecastChartRainProbability: document.getElementById("forecastChartRainProbability"),
+  forecastChartRainAmount: document.getElementById("forecastChartRainAmount"),
+  forecastChartUv: document.getElementById("forecastChartUv"),
   siteModal: document.getElementById("siteModal"),
   siteModalBackdrop: document.getElementById("siteModalBackdrop"),
   siteModalClose: document.getElementById("siteModalClose"),
@@ -73,6 +83,8 @@ let returnDateResolver = null;
 let weatherRefreshTimerId = null;
 let clockRefreshTimerId = null;
 let saveStateChain = Promise.resolve();
+let latestWeatherData = null;
+let forecastChartInstances = [];
 let calendarState = {
   year: new Date().getFullYear(),
   month: new Date().getMonth(),
@@ -91,6 +103,7 @@ async function initialize() {
   setupForms();
   setupThemeToggle();
   setupAdminPanel();
+  setupForecastDialog();
   setupPopupButton();
   startWeatherRefresh();
   startClockRefresh();
@@ -109,6 +122,35 @@ function setupPopupButton() {
     const url = POPUP_SITE_URL;
     openSitePopup(url);
   });
+}
+
+function setupForecastDialog() {
+  if (!refs.forecastDialog || !refs.forecastBackdrop || !refs.forecastClose) {
+    return;
+  }
+
+  const closeForecastDialog = () => {
+    destroyForecastCharts();
+    refs.forecastDialog.hidden = true;
+    refs.forecastBackdrop.hidden = true;
+  };
+
+  refs.forecastBackdrop.addEventListener("pointerup", closeForecastDialog);
+  refs.forecastClose.addEventListener("pointerup", closeForecastDialog);
+}
+
+function openForecastDialog(dayData) {
+  if (!refs.forecastDialog || !refs.forecastBackdrop) {
+    return;
+  }
+
+  refs.forecastTitle.textContent = dayData.dayLabel;
+  refs.forecastDate.textContent = dayData.dateLabel;
+
+  renderHourlyForecastChart(dayData.dateIso);
+
+  refs.forecastDialog.hidden = false;
+  refs.forecastBackdrop.hidden = false;
 }
 
 function openSitePopup(siteUrl) {
@@ -556,7 +598,8 @@ async function loadWeather() {
     url.searchParams.set("latitude", String(WEATHER_LOCATION.latitude));
     url.searchParams.set("longitude", String(WEATHER_LOCATION.longitude));
     url.searchParams.set("current", "temperature_2m,apparent_temperature,relative_humidity_2m,precipitation,weather_code,wind_speed_10m,visibility,uv_index");
-    url.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max");
+    url.searchParams.set("daily", "weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,apparent_temperature_min,precipitation_probability_max,precipitation_sum,wind_speed_10m_max,wind_direction_10m_dominant,wind_gusts_10m_max,uv_index_max,sunrise,sunset");
+    url.searchParams.set("hourly", "temperature_2m,precipitation_probability,precipitation,uv_index");
     url.searchParams.set("timezone", "auto");
 
     refs.weatherStatus.textContent = "Wetterdaten werden aktualisiert.";
@@ -578,6 +621,8 @@ async function loadWeather() {
 function renderWeather(data, locationLabel) {
   const current = data.current || {};
   const daily = data.daily || {};
+
+  latestWeatherData = data;
 
   refs.weatherLocation.textContent = `${locationLabel} · ${data.timezone || "lokale Zeitzone"}`;
   refs.weatherIcon.textContent = weatherEmoji(current.weather_code);
@@ -603,22 +648,37 @@ function renderWeather(data, locationLabel) {
 }
 
 function createForecastCard(daily, index) {
-  const dayCard = document.createElement("article");
+  const dayCard = document.createElement("button");
   dayCard.className = "forecast-card";
+  dayCard.type = "button";
 
   // Die Karten bleiben bewusst klein und datengetrieben, damit der Forecast leicht austauschbar ist.
-  const dayName = new Intl.DateTimeFormat("de-DE", { weekday: "short" }).format(new Date(`${daily.time[index]}T00:00:00`));
+  const dayDate = new Date(`${daily.time[index]}T00:00:00`);
+  const dayName = new Intl.DateTimeFormat("de-DE", { weekday: "short" }).format(dayDate);
+  const dayLabel = new Intl.DateTimeFormat("de-DE", { weekday: "long" }).format(dayDate);
+  const dateLabel = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "long" }).format(dayDate);
+  const weatherCode = daily.weather_code?.[index];
+  dayCard.setAttribute("aria-label", `Details für ${dayLabel}`);
   dayCard.innerHTML = `
       <div class="forecast-day">${dayName}</div>
-      <div class="forecast-icon">${weatherEmoji(daily.weather_code?.[index])}</div>
+      <div class="forecast-icon">${weatherEmoji(weatherCode)}</div>
       <div class="forecast-range">${Math.round(daily.temperature_2m_min?.[index] ?? 0)}° / ${Math.round(daily.temperature_2m_max?.[index] ?? 0)}°</div>
       <div class="forecast-precip">Regen: ${Math.round(daily.precipitation_probability_max?.[index] ?? 0)}%</div>
     `;
+
+  dayCard.addEventListener("click", () => {
+    openForecastDialog({
+      dateIso: daily.time[index],
+      dayLabel: dayLabel.charAt(0).toUpperCase() + dayLabel.slice(1),
+      dateLabel
+    });
+  });
 
   return dayCard;
 }
 
 function renderWeatherFallback() {
+  latestWeatherData = null;
   refs.weatherLocation.textContent = "Ingolstadt · Fallback";
   refs.weatherIcon.textContent = "⛅";
   refs.weatherTemp.textContent = "--°C";
@@ -647,6 +707,293 @@ function renderWeatherFallback() {
   });
 
   refs.weatherForecast.append(fragment);
+}
+
+function renderHourlyForecastChart(dateIso) {
+  if (!window.Chart || !refs.forecastChartTemperature || !refs.forecastChartRainProbability || !refs.forecastChartRainAmount || !refs.forecastChartUv) {
+    return;
+  }
+
+  destroyForecastCharts();
+
+  const hourly = latestWeatherData?.hourly;
+  const entries = getHourlyForecastEntries(hourly, dateIso);
+
+  if (entries.length === 0) {
+    return;
+  }
+
+  const labels = entries.map((entry) => formatHourLabel(entry.time));
+  const palette = getForecastChartPalette();
+
+  forecastChartInstances.push(createForecastChart(refs.forecastChartTemperature, "line", labels, {
+    label: "Temperatur",
+    data: entries.map((entry) => entry.temperature),
+    borderColor: palette.accent,
+    backgroundColor: palette.accentFill,
+    pointBackgroundColor: palette.accent,
+    pointBorderColor: palette.accent,
+    yAxisTitle: "°C",
+    beginAtZero: false,
+    suggestedMin: Math.floor(Math.min(...entries.map((entry) => entry.temperature))) - 1,
+    suggestedMax: Math.ceil(Math.max(...entries.map((entry) => entry.temperature))) + 1,
+    yTickCallback: (value) => `${Math.round(value)}°`
+  }, palette));
+
+  forecastChartInstances.push(createForecastChart(refs.forecastChartRainProbability, "line", labels, {
+    label: "Regenwahrscheinlichkeit",
+    data: entries.map((entry) => entry.rainProbability),
+    borderColor: palette.rainProbability,
+    backgroundColor: palette.rainProbabilityFill,
+    pointBackgroundColor: palette.rainProbability,
+    pointBorderColor: palette.rainProbability,
+    yAxisTitle: "%",
+    beginAtZero: true,
+    suggestedMin: 0,
+    suggestedMax: 100,
+    yTickCallback: (value) => `${Math.round(value)}%`
+  }, palette));
+
+  forecastChartInstances.push(createForecastChart(refs.forecastChartRainAmount, "line", labels, {
+    label: "Regenmenge",
+    data: entries.map((entry) => entry.rainAmount),
+    borderColor: palette.rainAmount,
+    backgroundColor: palette.rainAmountFill,
+    pointBackgroundColor: palette.rainAmount,
+    pointBorderColor: palette.rainAmount,
+    yAxisTitle: "mm",
+    beginAtZero: true,
+    suggestedMin: 0,
+    suggestedMax: Math.max(...entries.map((entry) => entry.rainAmount)) * 1.2 || 0.1,
+    yTickCallback: (value) => `${Number(value).toFixed(1)} mm`
+  }, palette));
+
+  forecastChartInstances.push(createForecastChart(refs.forecastChartUv, "line", labels, {
+    label: "UV-Index",
+    data: entries.map((entry) => entry.uvIndex),
+    borderColor: palette.uv,
+    backgroundColor: palette.uvFill,
+    pointBackgroundColor: palette.uv,
+    pointBorderColor: palette.uv,
+    yAxisTitle: "Index",
+    beginAtZero: true,
+    suggestedMin: 0,
+    suggestedMax: Math.max(...entries.map((entry) => entry.uvIndex)) + 1,
+    yTickCallback: (value) => `${Number(value).toFixed(1)}`
+  }, palette));
+}
+
+function destroyForecastCharts() {
+  forecastChartInstances.forEach((chart) => {
+    try {
+      chart.destroy();
+    } catch {
+      // Ignore teardown failures.
+    }
+  });
+
+  forecastChartInstances = [];
+}
+
+function getHourlyForecastEntries(hourly, dateIso) {
+  const times = hourly?.time;
+  if (!Array.isArray(times) || !dateIso) {
+    return [];
+  }
+
+  const entries = [];
+  for (let index = 0; index < times.length; index += 1) {
+    const time = times[index];
+    if (typeof time !== "string" || !time.startsWith(dateIso)) {
+      continue;
+    }
+
+    entries.push({
+      time,
+      temperature: Number(hourly.temperature_2m?.[index] ?? 0),
+      rainProbability: Number(hourly.precipitation_probability?.[index] ?? 0),
+      rainAmount: Number(hourly.precipitation?.[index] ?? 0),
+      uvIndex: Number(hourly.uv_index?.[index] ?? 0)
+    });
+  }
+
+  return entries;
+}
+
+function getForecastChartPalette() {
+  const style = getComputedStyle(document.documentElement);
+  const surface = style.getPropertyValue("--forecast-surface").trim() || "#000000";
+  const border = style.getPropertyValue("--forecast-border").trim() || "rgba(255,255,255,0.12)";
+  const grid = style.getPropertyValue("--forecast-grid").trim() || "rgba(255,255,255,0.08)";
+  const text = style.getPropertyValue("--forecast-text").trim() || "#f4f8fc";
+  const muted = style.getPropertyValue("--forecast-muted").trim() || "#c8d3df";
+  const accent = style.getPropertyValue("--accent").trim() || "#20d3b8";
+
+  return {
+    surface,
+    border,
+    grid,
+    text,
+    muted,
+    accent,
+    accentFill: rgbaFromCssColor(accent, 0.18),
+    rainProbability: "#6ca7ff",
+    rainProbabilityFill: "rgba(108, 167, 255, 0.24)",
+    rainAmount: "#76d7c4",
+    rainAmountFill: "rgba(118, 215, 196, 0.24)",
+    uv: "#ffd166",
+    uvFill: "rgba(255, 209, 102, 0.24)"
+  };
+}
+
+function rgbaFromCssColor(color, alpha) {
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return color;
+  }
+
+  context.fillStyle = color;
+  const normalized = context.fillStyle;
+
+  if (normalized.startsWith("#")) {
+    const hex = normalized.slice(1);
+    const size = hex.length === 3 ? 1 : 2;
+    const parts = hex.length === 3
+      ? hex.split("").map((part) => parseInt(part + part, 16))
+      : [0, 2, 4].map((start) => parseInt(hex.slice(start, start + 2), 16));
+    return `rgba(${parts[0]}, ${parts[1]}, ${parts[2]}, ${alpha})`;
+  }
+
+  return color;
+}
+
+function formatHourLabel(value) {
+  return new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(new Date(value));
+}
+
+function createForecastChart(canvas, chartType, labels, series, palette) {
+  if (!canvas) {
+    return null;
+  }
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    return null;
+  }
+
+  return new Chart(context, {
+    type: chartType,
+    data: {
+      labels,
+      datasets: [
+        {
+          label: series.label,
+          data: series.data,
+          borderColor: series.borderColor,
+          backgroundColor: series.backgroundColor,
+          pointBackgroundColor: series.pointBackgroundColor || series.borderColor,
+          pointBorderColor: series.pointBorderColor || series.borderColor,
+          pointRadius: chartType === "line" ? 2.5 : 0,
+          pointHoverRadius: 4,
+          borderWidth: 3,
+          tension: 0.35,
+          fill: chartType === "line"
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      normalized: true,
+      layout: {
+        padding: {
+          top: 6,
+          right: 10,
+          bottom: 18,
+          left: 8
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: palette.surface,
+          titleColor: palette.text,
+          bodyColor: palette.text,
+          borderColor: palette.border,
+          borderWidth: 1,
+          displayColors: false
+        }
+      },
+      scales: {
+        x: {
+          offset: true,
+          grid: {
+            color: palette.grid,
+            drawBorder: false
+          },
+          ticks: {
+            color: palette.muted,
+            maxRotation: 0,
+            autoSkip: true,
+            maxTicksLimit: 8,
+            padding: 10,
+            font: {
+              size: 12,
+              family: "Sora, Segoe UI, sans-serif"
+            }
+          }
+        },
+        y: {
+          beginAtZero: Boolean(series.beginAtZero),
+          suggestedMin: series.suggestedMin,
+          suggestedMax: series.suggestedMax,
+          grid: {
+            color: palette.grid,
+            drawBorder: false
+          },
+          ticks: {
+            color: palette.muted,
+            callback: series.yTickCallback,
+            font: {
+              size: 11,
+              family: "Sora, Segoe UI, sans-serif"
+            }
+          },
+          title: {
+            display: Boolean(series.yAxisTitle),
+            text: series.yAxisTitle,
+            color: palette.text,
+            font: {
+              size: 12,
+              family: "Sora, Segoe UI, sans-serif",
+              weight: "600"
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+function formatWeatherClock(value) {
+  if (!value) {
+    return "--:--";
+  }
+
+  const date = new Date(value.replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) {
+    return "--:--";
+  }
+
+  return new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function updateClock() {
