@@ -708,6 +708,10 @@ select {
   display: grid;
   align-content: start;
   gap: 8px;
+  /* allow vertical scrolling when many members exist */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 6px; /* keep a small gap so last item isn't hidden behind scrollbar */
 }
 
 .member-card {
