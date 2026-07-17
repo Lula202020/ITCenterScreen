@@ -347,11 +347,11 @@ select {
 }
 
 .content {
-  padding: 24px;
+  padding: 24px 24px 24px;
   height: 100dvh;
   min-height: 100dvh;
   display: grid;
-  grid-template-rows: auto minmax(520px, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
   overflow: hidden;
 }
@@ -361,7 +361,17 @@ select {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 18px;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+#teamPlannerView {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  gap: 12px;
 }
 
 .page-head-title {
@@ -380,7 +390,8 @@ select {
   display: grid;
   gap: 16px;
   min-height: 0;
-  align-self: start;
+  align-self: stretch;
+  flex-shrink: 0;
 }
 
 .weather-head {
@@ -654,15 +665,15 @@ select {
 }
 
 .board-wrap {
-  padding: 14px;
+  padding: 16px 16px 24px;
   min-height: 0;
   overflow: hidden;
   align-self: stretch;
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  height: calc(100dvh - 220px);
-  max-height: calc(100dvh - 220px);
+  margin-bottom: 0;
+  box-sizing: border-box;
 }
 
 .board-hint {
@@ -680,8 +691,9 @@ select {
   overflow-x: auto;
   overflow-y: hidden;
   padding: 4px 6px 8px;
-  height: 100%;
+  flex: 1 1 auto;
   min-height: 0;
+  max-height: 100%;
   align-items: stretch;
   scrollbar-width: thin;
   scrollbar-color: rgba(145, 170, 196, 0.35) transparent;
@@ -692,15 +704,14 @@ select {
   border: 1px solid rgba(145, 170, 196, 0.18);
   border-radius: 14px;
   padding: 12px;
-  min-height: 280px;
   min-height: 0;
-  height: 360px;
-  max-height: 360px;
+  height: 100%;
+  max-height: 100%;
   overflow: hidden;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
-  align-self: start;
+  align-self: stretch;
 }
 
 .column-head {
@@ -1310,9 +1321,6 @@ body[data-theme="light"] .manage-row {
     height: clamp(260px, 30vh, 320px);
   }
 
-  .board-wrap {
-    overflow: auto;
-  }
 }
 
 @media (max-height: 900px) {
