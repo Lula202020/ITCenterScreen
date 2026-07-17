@@ -53,6 +53,7 @@ const refs = {
   adminPanel: document.getElementById("adminPanel"),
   adminBackdrop: document.getElementById("adminBackdrop"),
   memberManageList: document.getElementById("memberManageList"),
+  memberHistoryList: document.getElementById("memberHistoryList"),
   returnDateDialog: document.getElementById("returnDateDialog"),
   returnDateBackdrop: document.getElementById("returnDateBackdrop"),
   returnDateDescription: document.getElementById("returnDateDescription"),
@@ -256,7 +257,9 @@ function createMember(name, categoryId) {
     id: crypto.randomUUID(),
     name,
     categoryId,
-    returnDate: null
+    returnDate: null,
+    isArchived: false,
+    archivedAt: null
   };
 }
 
@@ -341,7 +344,7 @@ function createCategoryColumn(category, index) {
   list.className = "member-list";
 
   state.members
-    .filter((member) => member.categoryId === category.id)
+    .filter((member) => !member.isArchived && member.categoryId === category.id)
     .forEach((member) => {
       list.append(createMemberCard(member));
     });
@@ -463,41 +466,110 @@ function updateSelectedMemberVisuals() {
 
 function renderAdminLists() {
   refs.memberManageList.innerHTML = "";
+  refs.memberHistoryList.innerHTML = "";
 
-  if (state.members.length === 0) {
+  const activeMembers = state.members
+    .filter((member) => !member.isArchived)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const archivedMembers = state.members
+    .filter((member) => member.isArchived)
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const renderEmpty = (container, text) => {
     const empty = document.createElement("p");
     empty.className = "manage-empty";
-    empty.textContent = "Keine Mitglieder vorhanden.";
-    refs.memberManageList.append(empty);
-    return;
+    empty.textContent = text;
+    container.append(empty);
+  };
+
+  if (activeMembers.length === 0) {
+    renderEmpty(refs.memberManageList, "Keine aktiven Mitglieder vorhanden.");
+  } else {
+    const activeFragment = document.createDocumentFragment();
+    activeMembers.forEach((member) => {
+      activeFragment.append(createManageRow(member));
+    });
+    refs.memberManageList.append(activeFragment);
   }
 
-  const fragment = document.createDocumentFragment();
-  state.members
-    .slice()
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((member) => {
-      fragment.append(createManageRow(member));
+  if (archivedMembers.length === 0) {
+    renderEmpty(refs.memberHistoryList, "Noch keine Mitglieder in der Historie.");
+  } else {
+    const historyFragment = document.createDocumentFragment();
+    archivedMembers.forEach((member) => {
+      historyFragment.append(createHistoryRow(member));
     });
-
-  refs.memberManageList.append(fragment);
+    refs.memberHistoryList.append(historyFragment);
+  }
 }
 
 function createManageRow(member) {
   const row = document.createElement("div");
   row.className = "manage-row";
 
+  const textWrap = document.createElement("div");
+  textWrap.className = "manage-row-text";
+
   const label = document.createElement("span");
   label.textContent = member.name;
+  textWrap.append(label);
+
+  const actions = document.createElement("div");
+  actions.className = "manage-actions";
+
+  const archive = document.createElement("button");
+  archive.type = "button";
+  archive.className = "manage-action-btn";
+  archive.textContent = "In Historie";
+  archive.addEventListener("pointerup", () => {
+    archiveMember(member.id);
+  });
 
   const remove = document.createElement("button");
   remove.type = "button";
+  remove.className = "manage-action-btn manage-action-btn-danger";
   remove.textContent = "Entfernen";
   remove.addEventListener("pointerup", () => {
     deleteMember(member.id);
   });
 
-  row.append(label, remove);
+  actions.append(archive, remove);
+  row.append(textWrap, actions);
+  return row;
+}
+
+function createHistoryRow(member) {
+  const row = document.createElement("div");
+  row.className = "manage-row";
+
+  const textWrap = document.createElement("div");
+  textWrap.className = "manage-row-text";
+
+  const label = document.createElement("span");
+  label.textContent = member.name;
+
+  const historyInfo = document.createElement("span");
+  historyInfo.className = "history-meta";
+  historyInfo.textContent = member.archivedAt ? `Nach Historie verschoben am ${formatDateTimeDe(member.archivedAt)}` : "Zur Historie verschoben";
+
+  textWrap.append(label, historyInfo);
+
+  const actions = document.createElement("div");
+  actions.className = "manage-actions";
+
+  const restore = document.createElement("button");
+  restore.type = "button";
+  restore.className = "manage-action-btn manage-action-btn-secondary";
+  restore.textContent = "Zurückholen";
+  restore.addEventListener("pointerup", () => {
+    restoreMember(member.id);
+  });
+
+  actions.append(restore);
+  row.append(textWrap, actions);
   return row;
 }
 
@@ -506,6 +578,38 @@ function deleteMember(memberId) {
   if (state.selectedMemberId === memberId) {
     state.selectedMemberId = null;
   }
+
+  renderBoard();
+  renderAdminLists();
+  void saveState();
+}
+
+function archiveMember(memberId) {
+  const member = state.members.find((item) => item.id === memberId);
+  if (!member || member.isArchived) {
+    return;
+  }
+
+  member.isArchived = true;
+  member.archivedAt = new Date().toISOString();
+
+  if (state.selectedMemberId === memberId) {
+    state.selectedMemberId = null;
+  }
+
+  renderBoard();
+  renderAdminLists();
+  void saveState();
+}
+
+function restoreMember(memberId) {
+  const member = state.members.find((item) => item.id === memberId);
+  if (!member || !member.isArchived) {
+    return;
+  }
+
+  member.isArchived = false;
+  member.archivedAt = null;
 
   renderBoard();
   renderAdminLists();
@@ -560,7 +664,9 @@ function normalizeMembers(members, categorySet) {
       id: member.id,
       name: member.name.trim(),
       categoryId: member.categoryId,
-      returnDate: typeof member.returnDate === "string" ? member.returnDate : null
+      returnDate: typeof member.returnDate === "string" ? member.returnDate : null,
+      isArchived: member.isArchived === true,
+      archivedAt: typeof member.archivedAt === "string" ? member.archivedAt : null
     }))
     .filter((member) => member.name.length > 0 && categorySet.has(member.categoryId));
 }
@@ -1189,6 +1295,25 @@ function shiftCalendarMonth(delta) {
   calendarState.year = next.getFullYear();
   calendarState.month = next.getMonth();
   renderCalendar();
+}
+
+function formatDateTimeDe(value) {
+  if (!value) {
+    return "—";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function formatDateDe(isoDate) {

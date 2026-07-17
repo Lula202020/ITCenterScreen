@@ -24,7 +24,9 @@ function readState() {
           id: member.id,
           name: member.name,
           categoryId: member.categoryId,
-          returnDate: typeof member.returnDate === 'string' ? member.returnDate : null
+          returnDate: typeof member.returnDate === 'string' ? member.returnDate : null,
+          isArchived: member.isArchived === true,
+          archivedAt: typeof member.archivedAt === 'string' ? member.archivedAt : null
         }))
     };
   } catch {
@@ -94,7 +96,9 @@ const server = http.createServer((request, response) => {
                 id: member.id,
                 name: member.name,
                 categoryId: member.categoryId,
-                returnDate: typeof member.returnDate === 'string' ? member.returnDate : null
+                returnDate: typeof member.returnDate === 'string' ? member.returnDate : null,
+                isArchived: member.isArchived === true,
+                archivedAt: typeof member.archivedAt === 'string' ? member.archivedAt : null
               }))
           };
 
