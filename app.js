@@ -3,6 +3,7 @@ const THEME_KEY = "team-planner-theme-v1";
 const WEATHER_REFRESH_MS = 15 * 60 * 1000;
 const CLOCK_REFRESH_MS = 1000;
 const STATE_API_URL = "/api/state";
+const TASKS_API_URL = "/api/tasks";
 const WEATHER_LOCATION = { latitude: 48.78, longitude: 11.42, label: "Ingolstadt" };
 const DEFAULT_TEAM_NAMES = ["Sam", "Jordan", "Mila"];
 const POPUP_SITE_URL = "http://localhost:8080"; // Flappy Bird WebGL server
@@ -21,12 +22,17 @@ const RETURN_DATE_REQUIRED = new Set(["berufsschule", "urlaub"]);
 const state = {
   categories: [],
   members: [],
+  tasks: [],
   selectedMemberId: null,
+  selectedTaskId: null,
+  editingTaskId: null,
   adminOpen: false,
+  tasksOpen: false,
   theme: "light"
 };
 
 const refs = {
+  appShell: document.getElementById("appShell"),
   board: document.getElementById("board"),
   weatherLocation: document.getElementById("weatherLocation"),
   weatherStatus: document.getElementById("weatherStatus"),
@@ -78,6 +84,30 @@ const refs = {
   siteModalInfo: document.getElementById("siteModalInfo"),
   siteModalFrame: document.getElementById("siteModalFrame"),
   siteModalOpenNew: document.getElementById("siteModalOpenNew")
+  ,
+  teamPlannerView: document.getElementById("teamPlannerView"),
+  tasksView: document.getElementById("tasksView"),
+  openTasksBtn: document.getElementById("openTasksBtn"),
+  closeTasksBtn: document.getElementById("closeTasksBtn"),
+  taskForm: document.getElementById("taskForm"),
+  newTaskBtn: document.getElementById("newTaskBtn"),
+  taskDialog: document.getElementById("taskDialog"),
+  taskDialogBackdrop: document.getElementById("taskDialogBackdrop"),
+  taskDialogClose: document.getElementById("taskDialogClose"),
+  taskDialogTitle: document.getElementById("taskDialogTitle"),
+  taskDeleteBtn: document.getElementById("taskDeleteBtn"),
+  taskTitle: document.getElementById("taskTitle"),
+  taskDescription: document.getElementById("taskDescription"),
+  taskStatus: document.getElementById("taskStatus"),
+  taskAssignees: document.getElementById("taskAssignees"),
+  taskPendingList: document.getElementById("taskPendingList"),
+  taskInProgressList: document.getElementById("taskInProgressList"),
+  taskDoneList: document.getElementById("taskDoneList"),
+  taskProblemList: document.getElementById("taskProblemList"),
+  taskPendingCount: document.getElementById("taskPendingCount"),
+  taskInProgressCount: document.getElementById("taskInProgressCount"),
+  taskDoneCount: document.getElementById("taskDoneCount"),
+  taskProblemCount: document.getElementById("taskProblemCount")
 };
 
 let returnDateResolver = null;
@@ -101,7 +131,10 @@ async function initialize() {
   renderCategorySelect();
   renderBoard();
   renderAdminLists();
+  renderTaskAssignees();
+  renderTasks();
   setupForms();
+  setupTasksView();
   setupThemeToggle();
   setupAdminPanel();
   setupForecastDialog();
@@ -194,6 +227,47 @@ function setupForms() {
   refs.memberForm.addEventListener("submit", onMemberFormSubmit);
 }
 
+function setupTasksView() {
+  refs.openTasksBtn.addEventListener("pointerup", () => setTasksOpen(true));
+  refs.closeTasksBtn.addEventListener("pointerup", () => setTasksOpen(false));
+  refs.newTaskBtn.addEventListener("pointerup", openNewTaskDialog);
+  refs.taskDialogClose.addEventListener("pointerup", closeTaskDialog);
+  refs.taskDialogBackdrop.addEventListener("pointerup", closeTaskDialog);
+  refs.taskDeleteBtn.addEventListener("pointerup", () => deleteTask(state.editingTaskId));
+  refs.taskForm.addEventListener("submit", onTaskFormSubmit);
+}
+
+function openNewTaskDialog() {
+  state.editingTaskId = null;
+  refs.taskForm.reset();
+  refs.taskDialogTitle.textContent = "Neue Aufgabe";
+  refs.taskForm.querySelector("button[type=submit]").textContent = "Aufgabe hinzufügen";
+  refs.taskDeleteBtn.hidden = true;
+  renderTaskAssignees();
+  refs.taskDialog.hidden = false;
+  refs.taskDialogBackdrop.hidden = false;
+  refs.taskTitle.focus();
+}
+
+function closeTaskDialog() {
+  refs.taskDialog.hidden = true;
+  refs.taskDialogBackdrop.hidden = true;
+  state.editingTaskId = null;
+}
+
+function setTasksOpen(isOpen) {
+  state.tasksOpen = isOpen;
+  document.body.classList.toggle("tasks-open", isOpen);
+  refs.appShell.classList.toggle("tasks-open", isOpen);
+  refs.teamPlannerView.classList.toggle("active", !isOpen);
+  refs.tasksView.classList.toggle("active", isOpen);
+  refs.openTasksBtn.setAttribute("aria-expanded", String(isOpen));
+  if (isOpen) {
+    renderTaskAssignees();
+    renderTasks();
+  }
+}
+
 function setupAdminPanel() {
   refs.adminToggle.addEventListener("pointerup", () => setAdminOpen(true));
   refs.adminClose.addEventListener("pointerup", () => setAdminOpen(false));
@@ -249,6 +323,7 @@ function onMemberFormSubmit(event) {
   refs.memberName.value = "";
   renderBoard();
   renderAdminLists();
+  renderTaskAssignees();
   void saveState();
 }
 
@@ -613,7 +688,187 @@ function restoreMember(memberId) {
 
   renderBoard();
   renderAdminLists();
+  renderTaskAssignees();
   void saveState();
+}
+
+function onTaskFormSubmit(event) {
+  event.preventDefault();
+
+  const title = refs.taskTitle.value.trim();
+  if (!title) return;
+
+  const assigneeIds = Array.from(refs.taskAssignees.querySelectorAll("input:checked"))
+    .map((input) => input.value);
+  const taskData = {
+    title,
+    description: refs.taskDescription.value.trim(),
+    status: refs.taskStatus.value,
+    assigneeIds
+  };
+
+  if (state.editingTaskId) {
+    const task = state.tasks.find((item) => item.id === state.editingTaskId);
+    if (task) Object.assign(task, taskData);
+  } else {
+    state.tasks.unshift({ ...taskData, id: crypto.randomUUID(), createdAt: new Date().toISOString() });
+  }
+
+  state.editingTaskId = null;
+  refs.taskForm.reset();
+  refs.taskDialogTitle.textContent = "Neue Aufgabe";
+  refs.taskForm.querySelector("button[type=submit]").textContent = "Aufgabe hinzufügen";
+  closeTaskDialog();
+  renderTasks();
+  void saveTasks();
+}
+
+function renderTaskAssignees() {
+  if (!refs.taskAssignees) return;
+  refs.taskAssignees.innerHTML = "";
+  const activeMembers = state.members.filter((member) => !member.isArchived).sort((a, b) => a.name.localeCompare(b.name));
+  activeMembers.forEach((member) => {
+    const label = document.createElement("label");
+    label.className = "task-assignee-option";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.value = member.id;
+    const name = document.createElement("span");
+    name.textContent = member.name;
+    label.append(checkbox, name);
+    refs.taskAssignees.append(label);
+  });
+}
+
+function renderTasks() {
+  if (!refs.taskPendingList || !refs.taskInProgressList) return;
+  const columns = [
+    ["pending", refs.taskPendingList, refs.taskPendingCount, "Keine ausstehenden Aufgaben."],
+    ["in-progress", refs.taskInProgressList, refs.taskInProgressCount, "Keine Aufgaben in Bearbeitung."],
+    ["done", refs.taskDoneList, refs.taskDoneCount, "Keine erledigten Aufgaben."],
+    ["problem", refs.taskProblemList, refs.taskProblemCount, "Keine Aufgaben mit Problem."]
+  ];
+  columns.forEach(([status, list, count, emptyText]) => {
+    list.innerHTML = "";
+    renderTaskList(list, state.tasks.filter((task) => task.status === status), emptyText);
+    count.textContent = String(state.tasks.filter((task) => task.status === status).length);
+  });
+  refs.tasksView.querySelectorAll(".task-column").forEach((column) => {
+    column.onclick = () => moveSelectedTaskToStatus(column.dataset.status);
+  });
+  updateSelectedTaskVisuals();
+}
+
+function renderTaskList(container, tasks, emptyText) {
+  if (tasks.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "task-empty";
+    empty.textContent = emptyText;
+    container.append(empty);
+    return;
+  }
+
+  tasks.forEach((task) => container.append(createTaskCard(task)));
+}
+
+function createTaskCard(task) {
+  const card = document.createElement("article");
+  card.className = "task-card";
+  card.dataset.taskId = task.id;
+
+  if (state.selectedTaskId === task.id) card.classList.add("selected-task");
+
+  card.addEventListener("click", (event) => {
+    event.stopPropagation();
+    state.selectedTaskId = state.selectedTaskId === task.id ? null : task.id;
+    updateSelectedTaskVisuals();
+  });
+  const title = document.createElement("h4");
+  title.textContent = task.title;
+  card.append(title);
+
+  if (task.description) {
+    const description = document.createElement("p");
+    description.textContent = task.description;
+    card.append(description);
+  }
+
+  const people = document.createElement("div");
+  people.className = "task-people";
+  const assignedMembers = task.assigneeIds
+    .map((memberId) => state.members.find((member) => member.id === memberId))
+    .filter(Boolean);
+  people.textContent = assignedMembers.length > 0 ? `Zuständig: ${assignedMembers.map((member) => member.name).join(", ")}` : "Noch niemand zugewiesen";
+  card.append(people);
+
+  const actions = document.createElement("div");
+  actions.className = "task-actions";
+  const editButton = document.createElement("button");
+  editButton.type = "button";
+  editButton.className = "task-action-btn";
+  editButton.textContent = "Bearbeiten";
+  editButton.addEventListener("pointerup", (event) => {
+    event.stopPropagation();
+    startTaskEditing(task);
+  });
+  actions.append(editButton);
+  if (task.status === "done") {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "task-action-btn task-action-danger";
+    deleteButton.textContent = "Löschen";
+    deleteButton.addEventListener("pointerup", (event) => {
+      event.stopPropagation();
+      deleteTask(task.id);
+    });
+    actions.append(deleteButton);
+  }
+  card.append(actions);
+  return card;
+}
+
+function startTaskEditing(task) {
+  state.editingTaskId = task.id;
+  refs.taskTitle.value = task.title;
+  refs.taskDescription.value = task.description;
+  refs.taskStatus.value = task.status;
+  Array.from(refs.taskAssignees.querySelectorAll("input[type=checkbox]")).forEach((checkbox) => {
+    checkbox.checked = task.assigneeIds.includes(checkbox.value);
+  });
+  refs.taskDialogTitle.textContent = "Aufgabe bearbeiten";
+  refs.taskForm.querySelector("button[type=submit]").textContent = "Änderungen speichern";
+  refs.taskDeleteBtn.hidden = false;
+  refs.taskDialog.hidden = false;
+  refs.taskDialogBackdrop.hidden = false;
+  refs.taskTitle.focus();
+}
+
+function moveSelectedTaskToStatus(status) {
+  if (state.selectedTaskId) moveTaskToStatus(state.selectedTaskId, status);
+}
+
+function moveTaskToStatus(taskId, status) {
+  const task = state.tasks.find((item) => item.id === taskId);
+  if (!task || !["pending", "in-progress", "done", "problem"].includes(status)) return;
+  task.status = status;
+  state.selectedTaskId = null;
+  renderTasks();
+  void saveTasks();
+}
+
+function deleteTask(taskId) {
+  if (!taskId) return;
+  state.tasks = state.tasks.filter((item) => item.id !== taskId);
+  if (state.selectedTaskId === taskId) state.selectedTaskId = null;
+  if (state.editingTaskId === taskId) closeTaskDialog();
+  renderTasks();
+  void saveTasks();
+}
+
+function updateSelectedTaskVisuals() {
+  refs.tasksView.querySelectorAll(".task-card").forEach((card) => {
+    card.classList.toggle("selected-task", card.dataset.taskId === state.selectedTaskId);
+  });
 }
 
 async function loadState() {
@@ -621,21 +876,43 @@ async function loadState() {
   const categorySet = new Set(state.categories.map((category) => category.id));
 
   try {
-    const response = await fetch(STATE_API_URL, { cache: "no-store" });
-    if (!response.ok) {
+    const [membersResponse, tasksResponse] = await Promise.all([
+      fetch(STATE_API_URL, { cache: "no-store" }),
+      fetch(TASKS_API_URL, { cache: "no-store" })
+    ]);
+    if (!membersResponse.ok) {
       state.members = loadLegacyMembers(categorySet);
-      return;
+    } else {
+      const parsedMembers = await membersResponse.json();
+      state.members = normalizeMembers(parsedMembers.members, categorySet);
     }
 
-    const parsed = await response.json();
-    state.members = normalizeMembers(parsed.members, categorySet);
+    state.tasks = tasksResponse.ok ? normalizeTasks((await tasksResponse.json()).tasks) : [];
 
     if (state.members.length === 0) {
       state.members = loadLegacyMembers(categorySet);
     }
   } catch {
     state.members = loadLegacyMembers(categorySet);
+    state.tasks = [];
   }
+}
+
+function normalizeTasks(tasks) {
+  if (!Array.isArray(tasks)) return [];
+  return tasks
+    .filter((task) => task && typeof task.id === "string" && typeof task.title === "string")
+    .map((task) => ({
+      id: task.id,
+      title: task.title.trim(),
+      description: typeof task.description === "string" ? task.description.trim() : "",
+      status: ["pending", "in-progress", "done", "problem"].includes(task.status)
+        ? task.status
+        : "pending",
+      assigneeIds: Array.isArray(task.assigneeIds) ? task.assigneeIds.filter((id) => typeof id === "string") : [],
+      createdAt: typeof task.createdAt === "string" ? task.createdAt : null
+    }))
+    .filter((task) => task.title.length > 0);
 }
 
 function loadLegacyMembers(categorySet) {
@@ -684,6 +961,18 @@ function saveState() {
   });
 }
 
+function saveTasks() {
+  const snapshot = { tasks: state.tasks };
+
+  saveStateChain = saveStateChain
+    .catch(() => undefined)
+    .then(() => persistTasks(snapshot));
+
+  return saveStateChain.catch((error) => {
+    console.warn("Tasks save failed", error);
+  });
+}
+
 async function persistState(snapshot) {
   const response = await fetch(STATE_API_URL, {
     method: "PUT",
@@ -695,6 +984,20 @@ async function persistState(snapshot) {
 
   if (!response.ok) {
     throw new Error(`State save failed: ${response.status}`);
+  }
+}
+
+async function persistTasks(snapshot) {
+  const response = await fetch(TASKS_API_URL, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(snapshot)
+  });
+
+  if (!response.ok) {
+    throw new Error(`Tasks save failed: ${response.status}`);
   }
 }
 

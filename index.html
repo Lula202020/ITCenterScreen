@@ -72,6 +72,7 @@
             <h2>Aktuelle Team-Standorte</h2>
           </div>
           <div class="header-actions">
+            <button id="openTasksBtn" class="admin-toggle" type="button" aria-expanded="false">Aufgaben</button>
             <button id="openPopupBtn" class="admin-toggle" type="button">Play Flappy Bird</button>
             <button id="adminToggle" class="admin-toggle" type="button" aria-controls="adminPanel" aria-expanded="false">Settings</button>
           </div>
@@ -81,7 +82,72 @@
           <div id="board" class="board" aria-live="polite"></div>
         </section>
       </section>
+
+      <section id="tasksView" class="module-view tasks-view" data-module-id="tasks">
+        <header class="page-head">
+          <div class="page-head-title">
+            <p class="weather-kicker">Arbeitsübersicht</p>
+            <h2>Aufgaben</h2>
+          </div>
+          <button id="closeTasksBtn" class="admin-toggle" type="button">Aufgaben schließen</button>
+        </header>
+
+        <div class="tasks-layout">
+          <div class="task-columns">
+            <section class="task-column panel" data-status="pending">
+              <div class="task-column-head"><h3>Ausstehend</h3><span id="taskPendingCount">0</span></div>
+              <div id="taskPendingList" class="task-list"></div>
+            </section>
+            <section class="task-column panel" data-status="in-progress">
+              <div class="task-column-head"><h3>In Bearbeitung</h3><span id="taskInProgressCount">0</span></div>
+              <div id="taskInProgressList" class="task-list"></div>
+            </section>
+            <section class="task-column panel" data-status="problem">
+              <div class="task-column-head"><h3>Problem</h3><span id="taskProblemCount">0</span></div>
+              <div id="taskProblemList" class="task-list"></div>
+            </section>
+            <section class="task-column panel" data-status="done">
+              <div class="task-column-head"><h3>Erledigt</h3><span id="taskDoneCount">0</span></div>
+              <div id="taskDoneList" class="task-list"></div>
+            </section>
+          </div>
+        </div>
+        <button id="newTaskBtn" class="btn-primary new-task-btn" type="button">Neue Aufgabe</button>
+      </section>
     </main>
+  </div>
+
+  <div id="taskDialogBackdrop" class="dialog-backdrop" hidden></div>
+  <div id="taskDialog" class="dialog task-dialog" role="dialog" aria-modal="true" aria-labelledby="taskDialogTitle" hidden>
+    <div class="task-dialog-head">
+      <h3 id="taskDialogTitle">Neue Aufgabe</h3>
+      <button id="taskDialogClose" class="forecast-close" type="button" aria-label="Aufgabenfenster schließen">✕</button>
+    </div>
+    <form id="taskForm" class="form-panel task-form">
+      <label>
+        Titel
+        <input id="taskTitle" type="text" maxlength="100" placeholder="z. B. Drucker einrichten" required>
+      </label>
+      <label>
+        Beschreibung
+        <textarea id="taskDescription" maxlength="500" placeholder="Weitere Details (optional)"></textarea>
+      </label>
+      <label>
+        Status
+        <select id="taskStatus">
+          <option value="pending">Ausstehend</option>
+          <option value="in-progress">In Bearbeitung</option>
+          <option value="done">Erledigt</option>
+          <option value="problem">Problem</option>
+        </select>
+      </label>
+      <div class="task-assignee-field">
+        <span>Personen zuordnen</span>
+        <div id="taskAssignees" class="task-assignees" role="group" aria-label="Personen zuordnen"></div>
+      </div>
+      <button type="submit" class="btn-primary">Aufgabe hinzufügen</button>
+      <button id="taskDeleteBtn" type="button" class="task-action-btn task-action-danger task-dialog-delete">Aufgabe löschen</button>
+    </form>
   </div>
 
   <div id="adminBackdrop" class="admin-backdrop"></div>
